@@ -101,19 +101,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
             }
         }))
 
-    //more thoughtfull try later
-    // const paginatedComments = await Comment.aggregatePaginate(aggregate, options);
 
-    // return res.status(200).json(
-    //     new ApiResponse(true, "Comments fetched successfully", {
-    //         totalComments,
-    //         comments: paginatedComments.docs,
-    //         pagination: {
-    //             page: paginatedComments.page,
-    //             limit: paginatedComments.limit,
-    //             totalPages: paginatedComments.totalPages,
-    //         },
-    //     })
 
 
 })

@@ -8,14 +8,7 @@ import { checkOwnership } from "../utils/checkOwnership.js"
 
 
 const createPlaylist = asyncHandler(async (req, res) => {
-    //TODO: create playlist
-    // 1. Extract title, description from req.body
-    // 2. Validate inputs
-    // 3. Create a new playlist document with owner = req.user._id
-    // 4. Save to DB
-    // 5. Return success response with created playlist
-
-    const {name, description } = req.body
+   const {name, description } = req.body
 
     if (!name) {
         throw new ApiError(400, "Playlist name is required")

@@ -15,7 +15,7 @@ function extractPublicIdFromUrl(url) {
         // https://res.cloudinary.com/{cloud_name}/image/upload/{version}/{folder}/{public_id}.{format}
         // https://res.cloudinary.com/{cloud_name}/image/upload/{folder}/{public_id}.{format}
         // https://res.cloudinary.com/{cloud_name}/image/upload/{public_id}.{format}
-        
+
         // Match the path after /upload/ and before the file extension
         // This handles version numbers, folders, and direct public_ids
         const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
@@ -68,7 +68,7 @@ const registerUser = asyncHandler(async (req, res) => {
         req.files && Array.isArray(req.files.coverImage)
         && req.files.coverImage.length > 0
     ) {
-         coverImageLocalPaths = req.files.coverImage[0].path
+        coverImageLocalPaths = req.files.coverImage[0].path
 
     }
 
@@ -135,57 +135,69 @@ const loginUser = asyncHandler(async (req, res) => {
     const loggedInUser = await User.findById(user._id).
         select("-password -refreshToken");
 
-    const options = {
+    const isProd = process.env.NODE_ENV === "production";
+
+    const cookieOptions = {
         httpOnly: true,
-        secure: true
-    }
+        secure: isProd,
+        sameSite: isProd ? "none" : "lax",
+        path: "/"
+    };
+
 
     return res
         .status(200)
-        .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
-        .json(
-            new ApiResponse(
-                200,
-                "User logged in successfully",
-                {
-                    user: loggedInUser,
-                    accessToken,
-                    refreshToken
-                }
-            )
-        );
+        .cookie("accessToken", accessToken, {
+            ...cookieOptions,
+            maxAge: 15 * 60 * 1000
+        })
+        .cookie("refreshToken", refreshToken, {
+            ...cookieOptions,
+            maxAge: 30 * 24 * 60 * 60 * 1000
+        })
+        .json(new ApiResponse(
+            200,
+            "User logged in successfully",
+            {
+                user: loggedInUser,
+                accessToken,
+                refreshToken
+            }
+        ));
+
 
 })
 
 const logoutUser = asyncHandler(async (req, res) => {
-    // Logout user logic here
-    await User.findByIdAndUpdate(
-        req.user._id,
-        {
-            $unset: {
-                refreshToken: 1
-            }
-        },
-        {
-            new: true
-        }
-    )
+  // req.user._id must be set by your auth middleware
+  const isProd = process.env.NODE_ENV === "production";
 
-    const options = {
-        httpOnly: true,
-        secure: true
-    }
+  // must match login/refresh cookie flags exactly
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
+  };
 
-    return res
-        .status(200)
-        .clearCookie("accessToken", options)
-        .clearCookie("refreshToken", options)
-        .json(
-            new ApiResponse(200, "User logged out successfully", {})
-        );
+  // Clear stored refresh token (choose the line that matches your schema)
+  // If you kept raw token field:
+  // await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } }, { new: true });
 
-})
+  // If you migrated to hashed storage (recommended):
+  await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { refreshTokenHash: null } },
+    { new: true }
+  );
+
+  return res
+    .clearCookie("accessToken", cookieOptions)
+    .clearCookie("refreshToken", cookieOptions)
+    .status(200)
+    .json(new ApiResponse(200, "User logged out successfully", {}));
+});
+
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
@@ -210,28 +222,38 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             throw new ApiError(401, "Refresh token expired or used");
         }
 
-        const options = {
+        const isProd = process.env.NODE_ENV === "production";
+
+        const cookieOptions = {
             httpOnly: true,
-            secure: true
-        }
+            secure: isProd,
+            sameSite: isProd ? "none" : "lax",
+            path: "/"
+        };
+
 
         const { accessToken, newRefreshToken } = await
             generateAccessAndRefreshTokens(user._id);
 
         return res
             .status(200)
-            .cookie("accessToken", accessToken, options)
-            .cookie("refreshToken", newRefreshToken, options)
-            .json(
-                new ApiResponse(
-                    200,
-                    "Access token refreshed successfully",
-                    {
-                        accessToken,
-                        refreshToken: newRefreshToken
-                    }
-                )
-            )
+            .cookie("accessToken", accessToken, {
+                ...cookieOptions,
+                maxAge: 15 * 60 * 1000
+            })
+            .cookie("refreshToken", newRefreshToken, {
+                ...cookieOptions,
+                maxAge: 30 * 24 * 60 * 60 * 1000
+            })
+            .json(new ApiResponse(
+                200,
+                "Access token refreshed successfully",
+                {
+                    accessToken,
+                    refreshToken: newRefreshToken
+                }
+            ));
+
     } catch (error) {
         throw new ApiError(401, error?.message || "Invalid refresh token");
     }
@@ -484,7 +506,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
                         },
                         {
-                            $addFields:{
+                            $addFields: {
                                 owner: {
                                     $first: "$owner"
                                 }

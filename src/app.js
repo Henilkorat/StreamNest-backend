@@ -19,21 +19,54 @@ const app = express();
 app.set("trust proxy", 1);
 
 // ---- FIXED CORS ----
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map(o => o.trim())
-  : [];
+// const allowedOrigins = process.env.CORS_ORIGIN
+//   ? process.env.CORS_ORIGIN.split(",").map(o => o.trim())
+//   : [];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // allow Postman / server-to-server
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("CORS blocked: " + origin));
-    },
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       if (!origin) return callback(null, true); // allow Postman / server-to-server
+//       if (allowedOrigins.includes(origin)) return callback(null, true);
+//       return callback(new Error("CORS blocked: " + origin));
+//     },
+//     credentials: true,
+//   })
+// );
+
+onst allowList = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const corsOptionsDelegate = (req, cb) => {
+  const origin = req.headers.origin;
+
+  // allow server-to-server tools (no Origin header)
+  if (!origin) return cb(null, { origin: true, credentials: true });
+
+  let allowed = allowList.includes(origin);
+
+  // (optional) allow any Vercel preview subdomain
+  try {
+    const u = new URL(origin);
+    if (u.hostname.endsWith(".vercel.app")) allowed = true;
+  } catch {}
+
+  // Do NOT throw. Just return origin: true/false.
+  return cb(null, {
+    origin: allowed,
     credentials: true,
-  })
-);
+  });
+};
 
+app.use(cors(corsOptionsDelegate));
+
+// Express 5: let CORS handle preflights, but fast-return is fine:
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 
 

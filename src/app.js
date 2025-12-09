@@ -34,7 +34,7 @@ app.set("trust proxy", 1);
 //   })
 // );
 
-onst allowList = (process.env.CORS_ORIGIN || "")
+const allowList = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map(s => s.trim())
   .filter(Boolean);

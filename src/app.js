@@ -34,8 +34,16 @@ app.use(
   })
 );
 
-// Preflight
-app.options("*", cors());
+// Preflight fix for Express 5 — MUST NOT use "*"
+app.options("/*", cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("CORS blocked: " + origin));
+  },
+  credentials: true
+}));
+
 
 // Body parser
 app.use(express.json({ limit: "20kb" }));

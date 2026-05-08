@@ -399,6 +399,7 @@ import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js"
+import { processVideo } from "../services/video.service.js"
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -515,9 +516,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
-// ... (rest of the controller functions are unchanged)
     const { title, description } = req.body
-    // TODO: get video, upload to cloudinary, create video
 
     const { videoFile, thumbnail } = req.files
 
@@ -528,47 +527,42 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Thumbnail image is required")
     }
 
-    //upload video to cloudinary
-    const videoUploadResult = await uploadOnCloudinary(videoFile[0].path, {
-        folder: "videos",
-        resource_type: "video"
-    })
-
-    //upload thumbnail to cloudinary
+    // Upload thumbnail to cloudinary immediately
     const thumbnailUploadResult = await uploadOnCloudinary(thumbnail[0].path, {
         folder: "thumbnails",
         resource_type: "image"
     })
 
-    if (!videoUploadResult || !videoUploadResult.secure_url) {
-        throw new ApiError(500, "Failed to upload video")
-    }
-
     if (!thumbnailUploadResult || !thumbnailUploadResult.secure_url) {
         throw new ApiError(500, "Failed to upload thumbnail")
     }
 
-    //create video document in db
+    // Get the local video file path
+    const localVideoPath = videoFile[0].path;
+
+    // Create video document in db with status 'processing'
     const newVideo = new Video({
-        videoFile: videoUploadResult.secure_url,
-        videoPublicId: videoUploadResult.public_id,
         thumbnail: thumbnailUploadResult.secure_url,
         thumbnailPublicId: thumbnailUploadResult.public_id,
         owner: req.user._id,
         title,
         description,
-        duration: videoUploadResult.duration,
+        duration: 0, // We can't know duration until ffmpeg parses it or client provides it. For MVP, 0 is fine.
         views: 0,
-        isPublished: true
+        isPublished: true,
+        processingStatus: 'processing'
     })
 
     await newVideo.save()
 
+    // Trigger asynchronous background processing
+    processVideo(newVideo._id, localVideoPath).catch(err => {
+        console.error("Background processing failed:", err);
+    });
+
     res
         .status(201)
-        .json(new ApiResponse(true, "Video published successfully", newVideo))
-
-
+        .json(new ApiResponse(true, "Video uploaded and is processing", newVideo))
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -600,15 +594,18 @@ const getVideoById = asyncHandler(async (req, res) => {
     }
 
     // Increment video views asynchronously (no need to await)
-    Video.findByIdAndUpdate(videoId, { $inc: { views: 1 } }).exec();
+    // Only increment if skipView is not true
+    if (req.query.skipView !== 'true') {
+        Video.findByIdAndUpdate(videoId, { $inc: { views: 1 } }).exec();
 
-    // ✅ Add this video to user's watch history (if logged in)
-    if (userId) {
-        await User.findByIdAndUpdate(
-            userId,
-            { $addToSet: { watchHistory: videoId } }, // prevents duplicates
-            { new: true }
-        );
+        // ✅ Add this video to user's watch history (if logged in)
+        if (userId) {
+            await User.findByIdAndUpdate(
+                userId,
+                { $addToSet: { watchHistory: videoId } }, // prevents duplicates
+                { new: true }
+            );
+        }
     }
 
     // Send response

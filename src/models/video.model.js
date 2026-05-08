@@ -4,7 +4,7 @@ import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 const videoSchema = new Schema({
     videoFile:{
         type: String,
-        required: true
+        required: false // Optional, can be removed in future if we strictly rely on masterPlaylistUrl
     },
     thumbnail:{
         type: String,
@@ -16,7 +16,20 @@ const videoSchema = new Schema({
     },
     videoPublicId:{
         type: String,
-        required: true
+        required: false // Optional
+    },
+    masterPlaylistUrl: {
+        type: String,
+        required: false
+    },
+    qualities: {
+        type: [String],
+        default: []
+    },
+    processingStatus: {
+        type: String,
+        enum: ['processing', 'completed', 'failed'],
+        default: 'processing'
     },
     owner:{
          type: mongoose.Schema.Types.ObjectId,

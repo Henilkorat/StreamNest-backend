@@ -100,8 +100,19 @@ app.use((req, res) => {
 
 // ---- Error Handler ----
 app.use((err, req, res, next) => {
-  console.error("Unhandled Error:", err);
-  res.status(500).json({ success: false, message: err.message || "Server Error" });
+  const statusCode = err.statusCode || 500;
+  
+  // Only log 500 errors as Unhandled
+  if (statusCode === 500) {
+    console.error("Unhandled Error:", err);
+  }
+
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || "Server Error",
+    errors: err.errors || [],
+    data: err.data || null
+  });
 });
 
 export default app;

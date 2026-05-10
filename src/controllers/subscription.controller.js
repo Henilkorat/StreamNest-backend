@@ -94,8 +94,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
     const { channelId } = req.params
-    console.log("req.params:", req.params);
-console.log("subscriberId:", channelId);
+
 
     if (!isValidObjectId(channelId)) {
         throw new ApiError(400, "Invalid subscriber ID")
@@ -104,7 +103,6 @@ console.log("subscriberId:", channelId);
     const subscribedChannels = await Subscription.find({subscriber: channelId})
                                          .populate('channel', 'userName avatar')
 
-    console.log(subscribedChannels); //remove after checking
 
     if(!subscribedChannels){
         return res

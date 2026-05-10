@@ -32,35 +32,35 @@ export const uploadHlsDirectoryToCloudinary = async (localDir, cloudBaseFolder) 
 
     console.log(`Starting upload of ${files.length} HLS files to Cloudinary...`);
 
-    const uploadPromises = files.map(async (filePath) => {
-        // Calculate relative path to maintain structure
-        const relativePath = path.relative(localDir, filePath);
-        // Replace Windows backslashes with forward slashes for Cloudinary public_id
-        const normalizedRelativePath = relativePath.split(path.sep).join('/');
-        
-        const publicId = `${cloudBaseFolder}/${normalizedRelativePath}`;
-
-        try {
-            const response = await cloudinary.uploader.upload(filePath, {
-                resource_type: "raw", // MUST be raw to preserve exact content and relative linking
-                public_id: publicId
-            });
-
-            if (normalizedRelativePath === 'master.m3u8') {
-                masterPlaylistUrl = response.secure_url;
-            }
-        } catch (error) {
-            console.error(`Failed to upload ${filePath}:`, error);
-            throw error;
-        }
-    });
-
-    // Upload in batches or all together (Cloudinary might rate limit if too many files)
-    // For MVP, Promise.all is fine, but chunking is safer for production.
     const chunkSize = 10;
-    for (let i = 0; i < uploadPromises.length; i += chunkSize) {
-        const chunk = uploadPromises.slice(i, i + chunkSize);
-        await Promise.all(chunk);
+    for (let i = 0; i < files.length; i += chunkSize) {
+        const chunkFiles = files.slice(i, i + chunkSize);
+        const uploadPromises = chunkFiles.map(async (filePath) => {
+            // Calculate relative path to maintain structure
+            const relativePath = path.relative(localDir, filePath);
+            // Replace Windows backslashes with forward slashes for Cloudinary public_id
+            const normalizedRelativePath = relativePath.split(path.sep).join('/');
+            
+            const publicId = `${cloudBaseFolder}/${normalizedRelativePath}`;
+
+            try {
+                const response = await cloudinary.uploader.upload(filePath, {
+                    resource_type: "raw", // MUST be raw to preserve exact content and relative linking
+                    public_id: publicId,
+                    timeout: 120000 // 120 seconds timeout to be safe
+                });
+
+                if (normalizedRelativePath === 'master.m3u8') {
+                    masterPlaylistUrl = response.secure_url;
+                }
+            } catch (error) {
+                console.error(`Failed to upload ${filePath}:`, error);
+                throw error;
+            }
+        });
+
+        // Wait for this chunk to finish before starting the next one
+        await Promise.all(uploadPromises);
     }
 
     console.log('All HLS files uploaded to Cloudinary successfully.');

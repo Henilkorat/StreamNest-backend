@@ -71,7 +71,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     const subscribers = await Subscription.find({channel: channelId})
                                          .populate('subscriber', 'userName avatar')
 
-    console.log(subscribers); //remove after checking
+     //remove after checking
 
     if(!subscribers){
         return res

@@ -1,0 +1,23 @@
+FROM node:20-alpine AS base
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm ci
+
+# ---------- Production Stage ----------
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY --from=base /app/node_modules ./node_modules
+
+COPY . .
+
+ENV NODE_ENV=production
+
+EXPOSE 5000
+
+CMD ["npm", "start"]
+

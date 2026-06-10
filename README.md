@@ -147,18 +147,3 @@ docker run -d -p 5000:5000 --env-file .env streamnest-backend:latest
 * Set proxy trust to parse secure HTTP cookies: `app.set("trust proxy", 1)`.
 * HTTP Health checks utilize the `/health` endpoint.
 
-## Challenges & Key Learnings
-
-* **Background Workers**: Spawning video conversion tasks outside the main Express execution loop prevents HTTP connection timeouts and request blockages.
-* **Raw HLS Uploads**: Uploading multi-resolution playlist segments requires utilizing `resource_type: "raw"` and matching structural folders on Cloudinary to prevent broken path references.
-* **Cross-Origin Cookies**: Setting `sameSite: "none"` and `secure: true` allows cookie sharing behind reverse proxies with cross-origin headers configured dynamically.
-
-## Future Improvements
-
-* **Distributed Job Queue**: Offload FFmpeg operations to BullMQ/Redis.
-* **Cascading Deletes**: Mongoose hook triggers to automatically purge orphan comments/likes on parent deletion.
-* **HLS CDN Delivery**: Cache segment directories through Cloudflare.
-
-## License
-
-This project is licensed under the ISC License.
